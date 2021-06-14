@@ -1,22 +1,15 @@
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
- * Describes the project definition and also the solution itself - project
- * schedule. Consists of tasks, resources and an evaluation. Able to build a
- * schedule from provided representation and manage schedule.
+ * Describes the project definition and also the solution itself - a project schedule.
+ * Consists of activities, resources and information about successors.
  */
 public class Schedule {
-
-    public static final int MAX_FINISH = 10000000;
-    private static final Logger LOGGER = Logger.getLogger(Schedule.class.getName());
 
     private Activity[] activities;
     private Resource[] resources;
     private int numSkills;
     private boolean[] hasSuccessors;
-
-    private Evaluation evaluation;
 
     public Schedule(InstanceLoader instanceLoader) {
         this.activities = instanceLoader.getActivities();
@@ -206,7 +199,7 @@ public class Schedule {
         return activities;
     }
 
-    public void setTasks(Activity[] activities) {
+    public void setActivities(Activity[] activities) {
         this.activities = activities;
     }
 
@@ -218,27 +211,11 @@ public class Schedule {
         this.resources = resources;
     }
 
-    public Evaluation getEvaluation() {
-        return evaluation;
-    }
-
-    public void setEvaluation(Evaluation evaluation) {
-        this.evaluation = evaluation;
-    }
-
     public int getNumSkills() {
         return numSkills;
     }
 
     public void setNumSkills(int numSkills) {
         this.numSkills = numSkills;
-    }
-
-    public boolean[] getHasSuccessors() {
-        return hasSuccessors;
-    }
-
-    public void setHasSuccessors(boolean[] hasSuccessors) {
-        this.hasSuccessors = hasSuccessors;
     }
 }

@@ -230,7 +230,7 @@ public class GeneticAlgorithm {
             currentActivity++;
         }
         Schedule child = parent1.getSchedule();
-        child.setTasks(childActivities);
+        child.setActivities(childActivities);
         return new Individual(child);
     }
 
