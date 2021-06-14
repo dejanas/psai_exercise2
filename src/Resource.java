@@ -8,40 +8,48 @@ import java.util.Arrays;
  */
 public class Resource {
 
-    private int id;
+    private final int id;
     private Skill[] skills;
     private int finish;
-
-    public Resource(int id, Skill[] skills, int finish) {
-        this.id = id;
-        this.skills = skills;
-        this.finish = finish;
-    }
-
-    public Resource() {
-        this(-1, null, -1);
-    }
+    private int currentActivityId;
 
     public Resource(int id, Skill[] skills) {
         this.id = id;
         this.skills = skills;
+        this.finish = -1;
+        this.currentActivityId = -1;
     }
 
     public boolean hasAvailableSkill(Activity activity, int type) {
-        return skills[type] != null && skills[type].getResourceId() == -1 && !hasContributed(activity, type);
+        boolean hasAvailableSkill = skills[type] != null && !hasContributed(activity);
+        if (!hasAvailableSkill) return false;
+        if (currentActivityId != -1) { //already assigned to some activity
+            hasAvailableSkill = finish < activity.getStart();
+        }
+        return hasAvailableSkill;
+    }
+
+    public boolean hasCurrentlyUnavailableSkill(Activity activity, int type) {
+        boolean hasSkill = skills[type] != null && !hasContributed(activity);
+        if (!hasSkill) return false;
+        if (currentActivityId != -1) { //already assigned to some activity
+            return finish >= activity.getStart();
+        }
+        return false;
     }
 
     public boolean isCapableOf(int type) {
         return skills[type] != null;
     }
 
-
-    public boolean hasContributed(Activity activity, int type) {
-        Skill skill = skills[type];
-        if (skill != null && skill.getResourceId() == id) {
-            RequiredSkill requiredSkill = activity.getRequiredSkills()[type];
-            for (Skill activitySkill : requiredSkill.getSkills()) {
-                if (activitySkill.getResourceId() == id) {
+    /**
+     * Checks if resource has already contributed to given activity.
+     */
+    public boolean hasContributed(Activity activity) {
+        RequiredSkill[] requiredSkills = activity.getRequiredSkills();
+        for (RequiredSkill requiredSkill : requiredSkills) {
+            for (Skill reqSkill : requiredSkill.getSkills()) {
+                if (reqSkill.getResourceId() == id) {
                     return true;
                 }
             }
@@ -70,6 +78,14 @@ public class Resource {
 
     public void setFinish(int finish) {
         this.finish = finish;
+    }
+
+    public int getCurrentActivityId() {
+        return currentActivityId;
+    }
+
+    public void setCurrentActivityId(int currentActivityId) {
+        this.currentActivityId = currentActivityId;
     }
 
     public String toString() {

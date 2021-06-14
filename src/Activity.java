@@ -55,13 +55,15 @@ public class Activity implements Comparable {
     }
 
     public String toString() {
-        StringBuilder p = new StringBuilder();
-        for (int i : predecessors) {
-            p.append(i).append(" ");
-        }
         StringBuilder s = new StringBuilder();
         for (RequiredSkill i : requiredSkills) {
             s.append(i).append(" ");
+        }
+        StringBuilder p = new StringBuilder();
+        if(predecessors != null){
+            for (int i : predecessors) {
+                p.append(i).append(" ");
+            }
         }
         return id + ", duration: " + duration + ", start: " + start
                 + ", required skills: " + s

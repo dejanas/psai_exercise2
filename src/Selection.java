@@ -28,9 +28,7 @@ public class Selection {
             candidates.add(individual);
             currentCandidate++;
         }
-
         candidates.sort(comparator);
-
         return candidates.get(0);
     }
 }

@@ -1,20 +1,22 @@
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
  * Performs GeneticAlgorithm to the MSPSP instance with default or given parameters.
  */
 public class GeneticAlgorithm {
+
+    private static final Logger LOGGER = Logger.getLogger(GeneticAlgorithm.class.getName());
+
     private int popSize;
     private int generations;
     private double mutationProbability;
     private double crossoverProbability;
     private Integer tournamentSize;
-    private InstanceLoader instanceLoader;
     private Population newPopulation;
+    private String filename;
     private static final int DEFAULT_POP_SIZE = 300;
     private static final int DEFAULT_GENERATIONS = 100;
     private static final double DEFAULT_MUTATION_PROBABILITY = 0.01;
@@ -37,7 +39,7 @@ public class GeneticAlgorithm {
         this.mutationProbability = mutationProbability;
         this.crossoverProbability = crossoverProbability;
         this.tournamentSize = tournamentSize;
-        loadInstance(filename);
+        this.filename = filename;
     }
 
     /**
@@ -49,15 +51,16 @@ public class GeneticAlgorithm {
         this.mutationProbability = DEFAULT_MUTATION_PROBABILITY;
         this.crossoverProbability = DEFAULT_CROSSOVER_PROBABILITY;
         this.tournamentSize = DEFAULT_TOURNAMENT_SIZE;
-        loadInstance(filename);
+        this.filename = filename;
     }
 
     /**
      * Load instance from the given filename.
      */
-    public void loadInstance(String filename) {
-        this.instanceLoader = new InstanceLoader(filename);
+    public InstanceLoader loadInstance(String filename) {
+        InstanceLoader instanceLoader = new InstanceLoader(filename);
         instanceLoader.loadInstance();
+        return instanceLoader;
     }
 
     /**
@@ -74,6 +77,7 @@ public class GeneticAlgorithm {
         ArrayList<Individual> individuals = new ArrayList<>();
         for (int i = 0; i < getPopSize(); i++) {
             Schedule schedule = randomInitializeSchedule();
+            // validateSchedule(schedule);
             individuals.add(initializeIndividual(schedule));
         }
         return new Population(individuals, 0);
@@ -83,37 +87,87 @@ public class GeneticAlgorithm {
      * Random initialize schedule. Random assign activities to capable resources.
      */
     Schedule randomInitializeSchedule() {
-        Schedule initialSchedule = new Schedule(instanceLoader);
+        Schedule initialSchedule = new Schedule(loadInstance(filename));
         Activity[] activities = initialSchedule.getActivities();
         Random generator = new Random();
 
         for (Activity activity : activities) {
+            setEarliestStartTimeForActivity(initialSchedule, activity);
+            Set<Resource> assignedResources = new HashSet<>();
+
             RequiredSkill[] requiredSkills = activity.getRequiredSkills();
             for (RequiredSkill requiredSkill : requiredSkills) {
                 if (requiredSkill.getRequired() > 0) {
                     for (Skill skill : requiredSkill.getSkills()) {
-                        HashMap<Integer, List<Resource>> resourcesForSkills = initialSchedule.getCapableResourcesForSkills(activity);
+                        HashMap<Integer, List<Resource>> resourcesForSkills = initialSchedule.getAvailableResourcesForSkills(activity);
                         List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
-                        Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                        initialSchedule.assign(resource, skill);
+
+                        if (capableResources.size() == 0) {
+                            resourcesForSkills = initialSchedule.getCurrentlyUnavailableResourcesForSkills(activity);
+                            capableResources = resourcesForSkills.get(requiredSkill.getType());
+                            if (capableResources.isEmpty()) {
+                                LOGGER.log(Level.SEVERE, "No more available resources, something is wrong!");
+                            }
+                            Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
+                            shiftStartTimeForActivity(activity, resource.getFinish());
+                            initialSchedule.assign(activity, resource, skill);
+                            assignedResources.add(resource);
+                        } else {
+                            //TODO: also get resource with earlier finish time? greedy? improved?
+                            Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
+                            initialSchedule.assign(activity, resource, skill);
+                            assignedResources.add(resource);
+                        }
                     }
                 } else {
-                    // TODO: check
+                    // TODO: add initial (dummy) activity
                 }
             }
+            setTime(activity, assignedResources);
         }
-        return assignTimestamps(initialSchedule);
+        return initialSchedule;
+    }
+
+    private void shiftStartTimeForActivity(Activity activity, int shift) {
+        activity.setStart(shift + 1);
+        //TODO: Add successors maybe?
+//        for(Activity successor : activity.getSuccessors()){
+//            successor.setStart(successor.getStart() + shift);
+//        }
+    }
+
+    private Resource getResourceWithEarliestFinish(List<Resource> capableResources) {
+        Resource minResource = capableResources.get(0);
+        for (Resource resource : capableResources) {
+            if (resource.getFinish() < minResource.getFinish()) {
+                minResource = resource;
+            }
+        }
+        return minResource;
     }
 
     /**
-     * Assign time to activities and resources by using Greedy approach.
+     * Sets starting time of activity to earliest possible depending on its predecessor relations.
      */
-    Schedule assignTimestamps(Schedule schedule) {
-        GreedyAlgorithm greedyAlgorithm = new GreedyAlgorithm(instanceLoader.getHasSuccessors());
-        schedule.setEvaluation(new Evaluation(schedule));
-        greedyAlgorithm.assignTimestamps(schedule);
-//        validateSchedule(schedule);
-        return schedule;
+    private void setEarliestStartTimeForActivity(Schedule schedule, Activity activity) {
+        int start = schedule.getEarliestTime(activity);
+        activity.setStart(start);
+    }
+
+    /**
+     * Reconfigures starting time of activity due to resources available for it.
+     */
+    private void setTime(Activity activity, Set<Resource> resourceSet) {
+        int start = activity.getStart();
+        for (Resource resource : resourceSet) {
+            if (resource.getFinish() > start) {
+                start = resource.getFinish();
+            }
+        }
+        activity.setStart(start);
+        for (Resource resource : resourceSet) {
+            resource.setFinish(start + activity.getDuration());
+        }
     }
 
     //TODO: call
@@ -134,11 +188,12 @@ public class GeneticAlgorithm {
                 individual = crossover(individual, parent2);
             }
 
-            if (shouldDoMutation()) {
+            //TODO: fix mutation step
+            if (false/*shouldDoMutation()*/) {
                 individual = mutate(individual);
             }
 
-            Schedule schedule = assignTimestamps(individual.getSchedule());
+            Schedule schedule = individual.getSchedule();
             newPopulation.addNewIndividual(initializeIndividual(schedule));
             currentIndividual++;
         }
@@ -185,20 +240,40 @@ public class GeneticAlgorithm {
     Individual mutate(Individual individual) {
         Schedule schedule = individual.getSchedule();
         Activity[] activities = schedule.getActivities();
+
         Random generator = new Random();
         Activity activityToMutate = activities[generator.nextInt(activities.length)];
+
         RequiredSkill[] requiredSkills = activityToMutate.getRequiredSkills();
+        Set<Resource> assignedResources = new HashSet<>();
+
         for (RequiredSkill requiredSkill : requiredSkills) {
             if (requiredSkill.getRequired() > 0) {
                 for (Skill skill : requiredSkill.getSkills()) {
-                    HashMap<Integer, List<Resource>> resourcesForSkills = schedule.getCapableResourcesForSkills(activityToMutate);
+                    HashMap<Integer, List<Resource>> resourcesForSkills = schedule.getAvailableResourcesForSkills(activityToMutate);
                     List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
-                    Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                    schedule.assign(resource, skill);
+
+                    if (capableResources.size() == 0) {
+                        resourcesForSkills = schedule.getCurrentlyUnavailableResourcesForSkills(activityToMutate);
+                        capableResources = resourcesForSkills.get(requiredSkill.getType());
+                        if (capableResources.isEmpty()) {
+                            LOGGER.log(Level.SEVERE, "No more available resources, something is wrong!");
+                        }
+                        Resource resource = getResourceWithEarliestFinish(capableResources);
+                        shiftStartTimeForActivity(activityToMutate, resource.getFinish());
+                        schedule.assign(activityToMutate, resource, skill);
+                        assignedResources.add(resource);
+                    } else {
+                        //TODO: also get resource with earlier finish time? greedy? improved?
+                        Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
+                        schedule.assign(activityToMutate, resource, skill);
+                        assignedResources.add(resource);
+                    }
                 }
             } else {
-                // TODO: check
+                // TODO: add initial (dummy) activity
             }
+            setTime(activityToMutate, assignedResources);
         }
         return individual;
     }

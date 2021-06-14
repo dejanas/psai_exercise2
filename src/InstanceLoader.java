@@ -29,7 +29,7 @@ public class InstanceLoader {
 
     HashMap<Integer, Set<Integer>> predecessors;
 
-    public InstanceLoader(String filename){
+    public InstanceLoader(String filename) {
         this.filename = filename;
     }
 
@@ -89,10 +89,8 @@ public class InstanceLoader {
         Activity[] activities = new Activity[numActivities];
 
         for (int i = 0; i < numActivities; i++) {
-            activities[i] = new Activity(i, requiredSkills[i], duration[i],
-                    predecessors.get(i) == null ? new HashSet<>() : predecessors.get(i));
+            activities[i] = new Activity(i + 1, requiredSkills[i], duration[i], predecessors.get(i + 1));
         }
-
         return activities;
     }
 
@@ -154,7 +152,7 @@ public class InstanceLoader {
         skipTo("succ");
         String[] succArray = getArrayMembers(line);
 
-        for (int i = 0; i < numRelations; i++) {
+        for (int i = 0; i < numRelations; ++i) {
             int succ = Integer.parseInt(succArray[i]);
             if (!predecessors.containsKey(succ)) {
                 predecessors.put(succ, new HashSet<>());
@@ -168,7 +166,7 @@ public class InstanceLoader {
     private boolean[] readSuccessors(HashMap<Integer, Set<Integer>> predecessors, int numActivities) throws IOException {
         boolean[] successors = new boolean[numActivities];
 
-        for (int i = 0; i < numActivities; i++) {
+        for (int i = 0; i < numActivities; ++i) {
             if (predecessors.get(i) != null) {
                 successors[i] = true;
             } else {

@@ -1,5 +1,4 @@
 import java.util.*;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -9,6 +8,7 @@ import java.util.logging.Logger;
  */
 public class Schedule {
 
+    public static final int MAX_FINISH = 10000000;
     private static final Logger LOGGER = Logger.getLogger(Schedule.class.getName());
 
     private Activity[] activities;
@@ -52,12 +52,14 @@ public class Schedule {
      * Assigns resource to the activity for given skill. Does not
      * assign time. Does not check if the assignment violates the constraints.
      */
-    public void assign(Resource resource, Skill skill) {
+    public void assign(Activity activity, Resource resource, Skill skill) {
         skill.setResourceId(resource.getId());
-        updateResourceSkill(resource, skill.getType());
+        updateResource(activity, resource, skill.getType());
+        // TODO: create Assignment object for output purpose
+        // return Assignment(activity, resource, skill);
     }
 
-    private void updateResourceSkill(Resource resource, int skillType) {
+    private void updateResource(Activity activity, Resource resource, int skillType) {
         Skill[] resourceSkills = resource.getSkills();
         for (Skill resourceSkill : resourceSkills) {
             if (resourceSkill != null && resourceSkill.getType() == skillType) {
@@ -65,6 +67,7 @@ public class Schedule {
                 break;
             }
         }
+        resource.setCurrentActivityId(activity.getId());
     }
 
     public Activity getActivity(int activityId) {
@@ -86,9 +89,9 @@ public class Schedule {
     }
 
     /**
-     * Finds all resources capable of doing given activity for different skills,
+     * Finds all resources capable and available of doing given activity for different skills,
      */
-    public HashMap<Integer, List<Resource>> getCapableResourcesForSkills(Activity activity) {
+    public HashMap<Integer, List<Resource>> getAvailableResourcesForSkills(Activity activity) {
         HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
         for (int i = 0; i < numSkills; i++) {
             resourcesPerSkills.put(i, new ArrayList<>());
@@ -102,10 +105,26 @@ public class Schedule {
     }
 
     /**
+     * Finds all resources capable but currently unavailable of doing given activity for different skills.
+     */
+    public HashMap<Integer, List<Resource>> getCurrentlyUnavailableResourcesForSkills(Activity activity) {
+        HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
+        for (int i = 0; i < numSkills; i++) {
+            resourcesPerSkills.put(i, new ArrayList<>());
+            for (Resource resource : resources) {
+                if (resource.hasCurrentlyUnavailableSkill(activity, i)) {
+                    resourcesPerSkills.get(i).add(resource);
+                }
+            }
+        }
+        return resourcesPerSkills;
+    }
+
+    /**
      * Finds all resources capable of doing given activity for different skills,
      * available at the given timestamp.
      */
-    public HashMap<Integer, List<Resource>> getCapableResourcesForSkills(Activity activity, int timestamp) {
+    public HashMap<Integer, List<Resource>> getAvailableResourcesForSkills(Activity activity, int timestamp) {
         HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
         for (int i = 0; i < numSkills; i++) {
             resourcesPerSkills.put(i, new ArrayList<>());
@@ -144,12 +163,12 @@ public class Schedule {
      */
     public int getEarliestTime(Activity activity) {
         int earliest = 0;
-        Set<Integer> pred = activity.getPredecessors();
-        if (pred != null) {
-            for (int p : pred) {
-                Activity a = getActivity(p);
-                if (a.getStart() + a.getDuration() > earliest) {
-                    earliest = a.getStart() + a.getDuration();
+        Set<Integer> predecessors = activity.getPredecessors();
+        if (predecessors != null) {
+            for (int p : predecessors) {
+                Activity pred = getActivity(p);
+                if (pred.getStart() + pred.getDuration() > earliest) {
+                    earliest = pred.getStart() + pred.getDuration();
                 }
             }
         }
