@@ -22,7 +22,7 @@ public class GeneticAlgorithm {
     private static final int DEFAULT_TOURNAMENT_SIZE = 5;
 
     /**
-     * Genetic Algorithm constructor.
+     * Constructor with parameters.
      *
      * @param popSize              - population size
      * @param generations          - the number of generations
@@ -40,6 +40,9 @@ public class GeneticAlgorithm {
         loadInstance(filename);
     }
 
+    /**
+     * Default constructor.
+     */
     GeneticAlgorithm(String filename) {
         this.popSize = DEFAULT_POP_SIZE;
         this.generations = DEFAULT_GENERATIONS;
@@ -49,15 +52,35 @@ public class GeneticAlgorithm {
         loadInstance(filename);
     }
 
-    public void loadInstance(String filename){
+    /**
+     * Load instance from the given filename.
+     */
+    public void loadInstance(String filename) {
         this.instanceLoader = new InstanceLoader(filename);
         instanceLoader.loadInstance();
     }
 
     /**
+     * Initializes individual with its instance of Schedule.
+     */
+    Individual initializeIndividual(Schedule schedule) {
+        return new Individual(schedule);
+    }
+
+    /**
+     * Creates initial population with randomly created Schedule.
+     */
+    Population initializePopulation() {
+        ArrayList<Individual> individuals = new ArrayList<>();
+        for (int i = 0; i < getPopSize(); i++) {
+            Schedule schedule = randomInitializeSchedule();
+            individuals.add(initializeIndividual(schedule));
+        }
+        return new Population(individuals, 0);
+    }
+
+    /**
      * Random initialize schedule. Random assign activities to capable resources.
-     *
-     * @return Schedule
      */
     Schedule randomInitializeSchedule() {
         Schedule initialSchedule = new Schedule(instanceLoader);
@@ -65,19 +88,18 @@ public class GeneticAlgorithm {
         Random generator = new Random();
 
         for (Activity activity : activities) {
-            HashMap<Integer, List<Resource>> resourcesForSkills = initialSchedule.getCapableResourcesForSkills();
-            Skill[] requiredSkills = activity.getRequiredSkills();
-            boolean noRequiredSkills = true;
-            for (Skill skill : requiredSkills) {
-                if (skill.getRequired() > 0) {
-                    noRequiredSkills = false;
-                    List<Resource> capableResources = resourcesForSkills.get(skill.getType());
-                    Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                    initialSchedule.assign(activity, resource, skill);
+            RequiredSkill[] requiredSkills = activity.getRequiredSkills();
+            for (RequiredSkill requiredSkill : requiredSkills) {
+                if (requiredSkill.getRequired() > 0) {
+                    for (Skill skill : requiredSkill.getSkills()) {
+                        HashMap<Integer, List<Resource>> resourcesForSkills = initialSchedule.getCapableResourcesForSkills(activity);
+                        List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
+                        Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
+                        initialSchedule.assign(resource, skill);
+                    }
+                } else {
+                    // TODO: check
                 }
-            }
-            if(noRequiredSkills){
-                // TODO: check
             }
         }
         return assignTimestamps(initialSchedule);
@@ -85,36 +107,19 @@ public class GeneticAlgorithm {
 
     /**
      * Assign time to activities and resources by using Greedy approach.
-     *
-     * @param schedule - schedule
-     * @return Schedule
      */
     Schedule assignTimestamps(Schedule schedule) {
         GreedyAlgorithm greedyAlgorithm = new GreedyAlgorithm(instanceLoader.getHasSuccessors());
         schedule.setEvaluation(new Evaluation(schedule));
         greedyAlgorithm.assignTimestamps(schedule);
+//        validateSchedule(schedule);
         return schedule;
-    }
-
-    Population initializePopulation(int id) {
-        ArrayList<Individual> individuals = new ArrayList<>();
-
-        for (int i = 0; i < getPopSize(); i++) {
-            Schedule schedule = randomInitializeSchedule();
-            individuals.add(initializeIndividual(schedule));
-        }
-
-        return new Population(individuals, id);
-    }
-
-    Individual initializeIndividual(Schedule schedule) {
-        return new Individual(schedule);
     }
 
     //TODO: call
     void validateSchedule(Schedule schedule) {
         ConstraintValidation validator = new ConstraintValidation(schedule);
-        System.out.println(validator.validate());
+        validator.validate();
     }
 
     Population createNewPopulation(Population population, int id) {
@@ -143,7 +148,6 @@ public class GeneticAlgorithm {
 
     /**
      * Selection step: select winner with tournament selection
-     *
      */
     Individual select(Population population) {
         Selection selection = new Selection(getTournamentSize(), population);
@@ -152,7 +156,6 @@ public class GeneticAlgorithm {
 
     /**
      * Recombination step: generate child from two parent individuals with crossover method
-     *
      */
     Individual crossover(Individual parent1, Individual parent2) {
         Activity[] parent1activities = parent1.getSchedule().getActivities();
@@ -178,28 +181,25 @@ public class GeneticAlgorithm {
 
     /**
      * Mutatation step: mutate one activity to use different recourses
-     *
      */
     Individual mutate(Individual individual) {
         Schedule schedule = individual.getSchedule();
         Activity[] activities = schedule.getActivities();
         Random generator = new Random();
         Activity activityToMutate = activities[generator.nextInt(activities.length)];
-        HashMap<Integer, List<Resource>> resourcesForSkills = schedule.getCapableResourcesForSkills();
-        Skill[] requiredSkills = activityToMutate.getRequiredSkills();
-        boolean noRequiredSkills = true;
-        for (Skill skill : requiredSkills) {
-            if (skill != null) {
-                noRequiredSkills = false;
-                List<Resource> capableResources = resourcesForSkills.get(skill.getType());
-                Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                schedule.assign(activityToMutate, resource, skill);
+        RequiredSkill[] requiredSkills = activityToMutate.getRequiredSkills();
+        for (RequiredSkill requiredSkill : requiredSkills) {
+            if (requiredSkill.getRequired() > 0) {
+                for (Skill skill : requiredSkill.getSkills()) {
+                    HashMap<Integer, List<Resource>> resourcesForSkills = schedule.getCapableResourcesForSkills(activityToMutate);
+                    List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
+                    Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
+                    schedule.assign(resource, skill);
+                }
+            } else {
+                // TODO: check
             }
         }
-        if(noRequiredSkills){
-            // TODO: check
-        }
-
         return individual;
     }
 
@@ -211,6 +211,9 @@ public class GeneticAlgorithm {
         return Math.random() > 1.0 - mutationProbability;
     }
 
+    /**
+     * Getters and setters.
+     */
     public int getPopSize() {
         return popSize;
     }

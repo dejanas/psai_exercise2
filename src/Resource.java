@@ -27,25 +27,26 @@ public class Resource {
         this.skills = skills;
     }
 
-    public boolean hasSkill(int type){
-        return skills[type] != null && skills[type].getAvailability() == 1;
+    public boolean hasAvailableSkill(Activity activity, int type) {
+        return skills[type] != null && skills[type].getResourceId() == -1 && !hasContributed(activity, type);
     }
 
-    public boolean hasSkill(Skill[] requiredSkills) {
-        boolean noRequiredSkills = true;
-        for (int i = 0; i < requiredSkills.length; i++) {
-            if (requiredSkills[i] != null) {
-                noRequiredSkills = false;
-                if (skills[i] != null) {
-                    int available = skills[i].getAvailability();
-                    if (available > 0) {
-                        skills[i].setAvailability(available - 1);
-                        return true;
-                    }
+    public boolean isCapableOf(int type) {
+        return skills[type] != null;
+    }
+
+
+    public boolean hasContributed(Activity activity, int type) {
+        Skill skill = skills[type];
+        if (skill != null && skill.getResourceId() == id) {
+            RequiredSkill requiredSkill = activity.getRequiredSkills()[type];
+            for (Skill activitySkill : requiredSkill.getSkills()) {
+                if (activitySkill.getResourceId() == id) {
+                    return true;
                 }
             }
         }
-        return noRequiredSkills;
+        return false;
     }
 
     /**

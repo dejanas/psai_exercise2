@@ -51,7 +51,7 @@ public class InstanceLoader {
             int[] duration = readDuration(numActivities);
 
             numSkills = readValue("nSkills");
-            Skill[][] requiredSkills = readRequiredSkills(numActivities, numSkills);
+            RequiredSkill[][] requiredSkills = readRequiredSkills(numActivities, numSkills);
 
             numResources = readValue("nResources");
             resources = readResources(numResources, numSkills);
@@ -84,19 +84,20 @@ public class InstanceLoader {
         return Integer.parseInt(line.substring(line.lastIndexOf(' ') + 1, line.lastIndexOf(';')));
     }
 
-    private Activity[] readActivities(int numActivities, Skill[][] requiredSkills,
+    private Activity[] readActivities(int numActivities, RequiredSkill[][] requiredSkills,
                                       int[] duration, HashMap<Integer, Set<Integer>> predecessors) throws IOException {
         Activity[] activities = new Activity[numActivities];
 
         for (int i = 0; i < numActivities; i++) {
-            activities[i] = new Activity(i, requiredSkills[i], duration[i], predecessors.get(i));
+            activities[i] = new Activity(i, requiredSkills[i], duration[i],
+                    predecessors.get(i) == null ? new HashSet<>() : predecessors.get(i));
         }
 
         return activities;
     }
 
-    private Skill[][] readRequiredSkills(int numActivities, int numSkills) throws IOException {
-        Skill[][] requiredSkillsPerActivity = new Skill[numActivities][numSkills];
+    private RequiredSkill[][] readRequiredSkills(int numActivities, int numSkills) throws IOException {
+        RequiredSkill[][] requiredSkillsPerActivity = new RequiredSkill[numActivities][numSkills];
 
         String sreqArray = readMultilineArray("sreq");
 
@@ -107,13 +108,12 @@ public class InstanceLoader {
 
         for (int i = 0; i < numActivities; i++) {
             String[] requiredSkillsArray = sreqPerActivityArray[i].split(",");
-            Skill[] requiredSkills = new Skill[4];
+            RequiredSkill[] requiredSkills = new RequiredSkill[numSkills];
             for (int j = 0; j < numSkills; ++j) {
                 int required = Integer.parseInt(requiredSkillsArray[j].trim());
-                requiredSkills[j] = new Skill(j, required);
+                requiredSkills[j] = new RequiredSkill(j, required);
             }
             requiredSkillsPerActivity[i] = requiredSkills;
-
         }
         return requiredSkillsPerActivity;
     }

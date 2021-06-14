@@ -6,18 +6,11 @@
 public class Skill {
 
     private int type;
-    private int availability;
     private int resourceId;
-    private int required;
 
     public Skill(int type) {
         this.type = type;
-        this.availability = 1;
-    }
-
-    public Skill(int type, int required) {
-        this.type = type;
-        this.required = required;
+        this.resourceId = -1;
     }
 
     public String toString() {
@@ -42,22 +35,6 @@ public class Skill {
 
     public void setType(int type) {
         this.type = type;
-    }
-
-    public int getAvailability() {
-        return availability;
-    }
-
-    public void setAvailability(int availability) {
-        this.availability = availability;
-    }
-
-    public int getRequired() {
-        return required;
-    }
-
-    public void setRequired(int required) {
-        this.required = required;
     }
 
     public int getResourceId() {

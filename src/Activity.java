@@ -9,12 +9,12 @@ import java.util.Set;
 public class Activity implements Comparable {
 
     private final int id;
-    private Skill[] requiredSkills;
+    private RequiredSkill[] requiredSkills;
     private int duration;
     private int start;
     private Set<Integer> predecessors;
 
-    public Activity(int id, Skill[] requiredSkills, int duration, int start,
+    public Activity(int id, RequiredSkill[] requiredSkills, int duration, int start,
                     Set<Integer> predecessors) {
         this.id = id;
         this.requiredSkills = requiredSkills;
@@ -23,7 +23,7 @@ public class Activity implements Comparable {
         this.predecessors = predecessors;
     }
 
-    public Activity(int id, Skill[] requiredSkills, int duration, Set<Integer> predecessors) {
+    public Activity(int id, RequiredSkill[] requiredSkills, int duration, Set<Integer> predecessors) {
         this(id, requiredSkills, duration, -1, predecessors);
     }
 
@@ -41,7 +41,7 @@ public class Activity implements Comparable {
 
     /**
      * Compares start times of activities.
-     *
+     * <p>
      * Returns -1 if this activity starts earlier,
      * 1 if given activity starts earlier
      * 0 if they start at the same time
@@ -60,7 +60,7 @@ public class Activity implements Comparable {
             p.append(i).append(" ");
         }
         StringBuilder s = new StringBuilder();
-        for (Skill i : requiredSkills) {
+        for (RequiredSkill i : requiredSkills) {
             s.append(i).append(" ");
         }
         return id + ", duration: " + duration + ", start: " + start
@@ -75,11 +75,11 @@ public class Activity implements Comparable {
         return id;
     }
 
-    public Skill[] getRequiredSkills() {
+    public RequiredSkill[] getRequiredSkills() {
         return requiredSkills;
     }
 
-    public void setRequiredSkills(Skill[] requiredSkills) {
+    public void setRequiredSkills(RequiredSkill[] requiredSkills) {
         this.requiredSkills = requiredSkills;
     }
 
@@ -105,9 +105,5 @@ public class Activity implements Comparable {
 
     public void setPredecessors(Set<Integer> predecessors) {
         this.predecessors = predecessors;
-    }
-
-    public void setResourceForSkill(int resourceId, int skillType) {
-        requiredSkills[skillType].setResourceId(resourceId);
     }
 }

@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Describes the project definition and also the solution itself - project
@@ -6,6 +8,8 @@ import java.util.*;
  * schedule from provided representation and manage schedule.
  */
 public class Schedule {
+
+    private static final Logger LOGGER = Logger.getLogger(Schedule.class.getName());
 
     private Activity[] activities;
     private Resource[] resources;
@@ -19,7 +23,6 @@ public class Schedule {
         this.resources = instanceLoader.getResources();
         this.numSkills = instanceLoader.getNumSkills();
         this.hasSuccessors = instanceLoader.getHasSuccessors();
-        clear(true);
     }
 
     public Schedule(Schedule schedule) {
@@ -49,33 +52,18 @@ public class Schedule {
      * Assigns resource to the activity for given skill. Does not
      * assign time. Does not check if the assignment violates the constraints.
      */
-    public void assign(Activity activity, Resource resource, Skill skill) {
-        int availability = skill.getAvailability();
-        skill.setAvailability(availability - 1);
-        activity.setResourceForSkill(resource.getId(), skill.getType());
+    public void assign(Resource resource, Skill skill) {
+        skill.setResourceId(resource.getId());
+        updateResourceSkill(resource, skill.getType());
     }
 
-    /**
-     * Clears timestamps from tasks and resources.
-     * and optionally activity - resource assignments
-     *
-     * @param withAssignments determines whether to clear assignments
-     */
-    public void clear(boolean withAssignments) {
-        if (withAssignments) {
-            for (Activity activity : activities) {
-                activity.setStart(-1);
-                for (Skill skill : activity.getRequiredSkills()) {
-                    skill.setResourceId(-1);
-                }
+    private void updateResourceSkill(Resource resource, int skillType) {
+        Skill[] resourceSkills = resource.getSkills();
+        for (Skill resourceSkill : resourceSkills) {
+            if (resourceSkill != null && resourceSkill.getType() == skillType) {
+                resourceSkill.setResourceId(resource.getId());
+                break;
             }
-        } else {
-            for (Activity activity : activities) {
-                activity.setStart(-1);
-            }
-        }
-        for (Resource resource : resources) {
-            resource.setFinish(-1);
         }
     }
 
@@ -98,27 +86,14 @@ public class Schedule {
     }
 
     /**
-     * Finds all resources capable of doing given activity
+     * Finds all resources capable of doing given activity for different skills,
      */
-    public List<Resource> getCapableResources(Activity activity) {
-        List<Resource> result = new LinkedList<>();
-        for (Resource resource : resources) {
-            if (canDo(activity, resource)) {
-                result.add(resource);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Finds all resources capable of doing given activity
-     */
-    public HashMap<Integer, List<Resource>> getCapableResourcesForSkills() {
+    public HashMap<Integer, List<Resource>> getCapableResourcesForSkills(Activity activity) {
         HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
         for (int i = 0; i < numSkills; i++) {
             resourcesPerSkills.put(i, new ArrayList<>());
             for (Resource resource : resources) {
-                if (resource.hasSkill(i)) {
+                if (resource.hasAvailableSkill(activity, i)) {
                     resourcesPerSkills.get(i).add(resource);
                 }
             }
@@ -127,25 +102,25 @@ public class Schedule {
     }
 
     /**
-     * Finds all resources capable of doing given activity and
-     * available at the given timestamp
+     * Finds all resources capable of doing given activity for different skills,
+     * available at the given timestamp.
      */
-    public List<Resource> getCapableResources(Activity activity, int timestamp) {
-        List<Resource> result = new LinkedList<>();
-        for (Resource resource : resources) {
-            if (canDo(activity, resource) && timestamp >= resource.getFinish()) {
-                result.add(resource);
+    public HashMap<Integer, List<Resource>> getCapableResourcesForSkills(Activity activity, int timestamp) {
+        HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
+        for (int i = 0; i < numSkills; i++) {
+            resourcesPerSkills.put(i, new ArrayList<>());
+            for (Resource resource : resources) {
+                if (resource.hasAvailableSkill(activity, i) && timestamp >= resource.getFinish()) {
+                    resourcesPerSkills.get(i).add(resource);
+                }
             }
         }
-        return result;
+        return resourcesPerSkills;
     }
 
     /**
-     * Finds a resource from the list <code>freeResources</code> with the earliest
+     * Finds a resource from the list freeResources with the earliest
      * finish time of its work.
-     *
-     * @param freeResources list of resources
-     * @return Resource with the earliest finish time of work
      */
     public Resource findFirstFreeResource(List<Resource> freeResources) {
         if (freeResources == null) {
@@ -166,19 +141,15 @@ public class Schedule {
      * Calculates the earliest possible time, in which activity
      * given can be started. It is the time, when
      * the last of its predecessors gets finished.
-     *
-     * @param activity activity, for which we want to find the
-     *                 earliest time of start
-     * @return finish time of the last predecessor of activity
      */
     public int getEarliestTime(Activity activity) {
         int earliest = 0;
         Set<Integer> pred = activity.getPredecessors();
         if (pred != null) {
             for (int p : pred) {
-                Activity t = getActivity(p);
-                if (t.getStart() + t.getDuration() > earliest) {
-                    earliest = t.getStart() + t.getDuration();
+                Activity a = getActivity(p);
+                if (a.getStart() + a.getDuration() > earliest) {
+                    earliest = a.getStart() + a.getDuration();
                 }
             }
         }
@@ -186,26 +157,27 @@ public class Schedule {
     }
 
     /**
-     * Gets all activities, which given resource can do.
-     *
-     * @param r resource, for which we look for activities, that it can do
-     * @return activities doable by r
+     * Clears timestamps from activities and resources.
      */
-    public List<Activity> tasksCapableByResource(Resource r) {
-        List<Activity> activities = new LinkedList<>();
-        for (Activity t : getActivities()) {
-            if (canDo(t, r)) {
-                activities.add(t);
+    public void clear() {
+        for (Activity activity : activities) {
+            activity.setStart(-1);
+            for (RequiredSkill requiredSkill : activity.getRequiredSkills()) {
+                if (requiredSkill.getRequired() > 0) {
+                    for (Skill skill : requiredSkill.getSkills()) {
+                        if (skill != null) {
+                            skill.setResourceId(-1);
+                        }
+                    }
+                }
             }
         }
-        return activities;
-    }
-
-    public boolean canDo(Activity activity, Resource resource) {
-        if (resource == null) {
-            return false;
+        for (Resource resource : resources) {
+            for (Skill skill : resource.getSkills()) {
+                skill.setResourceId(-1);
+            }
+            resource.setFinish(-1);
         }
-        return resource.hasSkill(activity.getRequiredSkills());
     }
 
     /**

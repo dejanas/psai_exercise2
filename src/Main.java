@@ -8,7 +8,7 @@ public class Main {
     public static void main(String[] args) {
         GeneticAlgorithm geneticAlgorithm = new GeneticAlgorithm(TEST_INSTANCE);
         int generation = 0;
-        Population population = geneticAlgorithm.initializePopulation(0);
+        Population population = geneticAlgorithm.initializePopulation();
         population.evaluateDuration();
         try {
             PrintWriter pw = new PrintWriter("results/res_" + INSTANCE_NAME + ".csv");

@@ -19,7 +19,6 @@ public class GreedyAlgorithm {
      * Assumes that all assignments are set. Uses knowledge about
      * successors of each task to first place the activities with successors
      * and then rest of the tasks.
-     *
      */
     public void assignTimestamps(Schedule schedule) {
         Resource[] resources = schedule.getResources();
@@ -28,26 +27,25 @@ public class GreedyAlgorithm {
         }
         Activity[] activities = schedule.getActivities();
         for (int i = 0; i < activities.length; ++i) {
-            Skill[] requiredSkills = activities[i].getRequiredSkills();
             if (hasSuccessors[i]) {
-                Set<Resource> resourceSet = new HashSet<>();
-                for (Skill skill : requiredSkills) {
-                    if (skill.getRequired() > 0) {
-                        resourceSet.add(resources[skill.getResourceId()]);
-                        setTime(schedule, activities[i], resourceSet);
-                    }
-                }
+                assignTimestamp(activities[i], schedule);
             }
         }
         for (int i = 0; i < activities.length; ++i) {
-            Skill[] requiredSkills = activities[i].getRequiredSkills();
             if (!hasSuccessors[i]) {
-                Set<Resource> resourceSet = new HashSet<>();
-                for (Skill skill : requiredSkills) {
-                    if (skill.getRequired() > 0) {
-                        resourceSet.add(resources[skill.getResourceId()]);
-                        setTime(schedule, activities[i], resourceSet);
-                    }
+                assignTimestamp(activities[i], schedule);
+            }
+        }
+    }
+
+    private void assignTimestamp(Activity activity, Schedule schedule) {
+        RequiredSkill[] requiredSkills = activity.getRequiredSkills();
+        Set<Resource> resourceSet = new HashSet<>();
+        for (RequiredSkill requiredSkill : requiredSkills) {
+            if (requiredSkill.getRequired() > 0) {
+                for (Skill skill : requiredSkill.getSkills()) {
+                    resourceSet.add(schedule.getResource(skill.getResourceId()));
+                    setTime(schedule, activity, resourceSet);
                 }
             }
         }
