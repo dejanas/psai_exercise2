@@ -1,12 +1,11 @@
-import java.util.Arrays;
 import java.util.Set;
 
 
 /**
  * Activity is described by skills required, duration and predecessors (precedence relations).
- * After scheduling, activity stores information about resources assigned to it and start time. (-1 if not assigned)
+ * After scheduling, activity stores information about resources assigned to it and start time. (-1 initially)
  */
-public class Activity implements Comparable {
+public class Activity {
 
     private final int id;
     private RequiredSkill[] requiredSkills;
@@ -27,40 +26,13 @@ public class Activity implements Comparable {
         this(id, requiredSkills, duration, -1, predecessors);
     }
 
-    @Override
-    public boolean equals(Object a) {
-        if (!(a instanceof Activity)) {
-            return false;
-        }
-        Activity activity = (Activity) a;
-        return duration == activity.duration &&
-                id == activity.id &&
-                predecessors.equals(activity.predecessors) &&
-                Arrays.equals(requiredSkills, activity.requiredSkills);
-    }
-
-    /**
-     * Compares start times of activities.
-     * <p>
-     * Returns -1 if this activity starts earlier,
-     * 1 if given activity starts earlier
-     * 0 if they start at the same time
-     */
-    @Override
-    public int compareTo(Object activity) {
-        if (!(activity instanceof Activity)) {
-            throw new IllegalArgumentException("Invalid type comparison");
-        }
-        return Integer.compare(start, ((Activity) activity).start);
-    }
-
     public String toString() {
         StringBuilder s = new StringBuilder();
         for (RequiredSkill i : requiredSkills) {
             s.append(i).append(" ");
         }
         StringBuilder p = new StringBuilder();
-        if(predecessors != null){
+        if (predecessors != null) {
             for (int i : predecessors) {
                 p.append(i).append(" ");
             }

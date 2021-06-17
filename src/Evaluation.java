@@ -1,5 +1,5 @@
 /**
- * Utility class for evaluation methods of the Schedule.
+ * Utility class for evaluation methods of the Schedule
  */
 public class Evaluation {
 
@@ -42,4 +42,8 @@ public class Evaluation {
         return (double) getDuration() / (double) getMaxDuration();
     }
 
+    public int getNumberOfConflicts(){
+       ConstraintValidation validation = new ConstraintValidation(schedule);
+       return validation.getNumberOfConflicts();
+    }
 }

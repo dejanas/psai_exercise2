@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Describes the project definition and also the solution itself - a project schedule.
@@ -9,49 +10,79 @@ public class Schedule {
     private Activity[] activities;
     private Resource[] resources;
     private int numSkills;
-    private boolean[] hasSuccessors;
 
     public Schedule(InstanceLoader instanceLoader) {
         this.activities = instanceLoader.getActivities();
         this.resources = instanceLoader.getResources();
         this.numSkills = instanceLoader.getNumSkills();
-        this.hasSuccessors = instanceLoader.getHasSuccessors();
+        setEarliestStartTimeForActivities(false);
     }
 
-    public Schedule(Schedule schedule) {
-        activities = new Activity[schedule.getActivities().length];
-        for (int i = 0; i < activities.length; i++) {
-            Activity org = schedule.getActivities()[i];
-            activities[i] = new Activity(org.getId(), org.getRequiredSkills(),
-                    org.getDuration(), org.getPredecessors());
-        }
-        resources = new Resource[schedule.getResources().length];
-        for (int i = 0; i < resources.length; i++) {
-            Resource org = schedule.getResources()[i];
-            resources[i] = new Resource(org.getId(), org.getSkills());
-        }
-        for (Activity activity : activities) {
-            activity.setStart(schedule.getActivity(activity.getId()).getStart());
-            activity.setRequiredSkills(schedule.getActivity(activity.getId()).getRequiredSkills());
-        }
-        for (Resource resource : resources) {
-            resource.setFinish(schedule.getResource(resource.getId()).getFinish());
-        }
+    public Schedule(Schedule schedule, Activity[] activities) {
         numSkills = schedule.numSkills;
-        hasSuccessors = schedule.hasSuccessors;
+        this.activities = activities;
+        this.resources = schedule.resources;
     }
 
     /**
-     * Assigns resource to the activity for given skill. Does not
-     * assign time. Does not check if the assignment violates the constraints.
+     * Sets starting time of activity in respect to precedence relations
+     */
+    private void setEarliestStartTimeForActivities(boolean addRandomTime) {
+        for (Activity activity : activities) {
+            int earliest = getEarliestTime(activity);
+            activity.setStart(earliest);
+        }
+
+        if (addRandomTime) {
+            int latestStartTime = 0;
+            for (Activity activity : activities) {
+                if (activity.getStart() > latestStartTime) {
+                    latestStartTime = activity.getStart();
+                }
+            }
+
+            Random random = new Random();
+            for (Activity activity : activities) {
+                activity.setStart(activity.getStart() + random.nextInt(5));
+            }
+        }
+    }
+
+
+    /**
+     * Calculates the earliest possible time in which given activity
+     * can be started i.e. the time, when
+     * the last of its predecessors have finished.
+     */
+    public int getEarliestTime(Activity activity) {
+        int earliest = 0;
+        Set<Integer> predecessors = activity.getPredecessors();
+        if (predecessors != null) {
+            for (int p : predecessors) {
+                Activity pred = getActivity(p);
+                if(pred == null){
+                    int i = 0;
+                }
+                int predFinish = pred.getStart() + pred.getDuration();
+                if (predFinish > earliest) {
+                    earliest = predFinish + 1;
+                }
+            }
+        }
+        return earliest;
+    }
+
+    /**
+     * Assigns resource to the activity for given skill and updates state of the resource
      */
     public void assign(Activity activity, Resource resource, Skill skill) {
         skill.setResourceId(resource.getId());
         updateResource(activity, resource, skill.getType());
-        // TODO: create Assignment object for output purpose
-        // return Assignment(activity, resource, skill);
     }
 
+    /**
+     * Updates status of the skill reserved by assigning id and sets the current activity taking the resource
+     */
     private void updateResource(Activity activity, Resource resource, int skillType) {
         Skill[] resourceSkills = resource.getSkills();
         for (Skill resourceSkill : resourceSkills) {
@@ -63,22 +94,24 @@ public class Schedule {
         resource.setCurrentActivityId(activity.getId());
     }
 
-    public Activity getActivity(int activityId) {
-        for (Activity activity : activities) {
-            if (activity.getId() == activityId) {
-                return activity;
+    /**
+     * Shift start time of activity if no available resources found at that moment
+     * and shift depending on possible new finish times of predecessors
+     */
+    public void shiftStartTimeForActivity(Activity activity, int resourceFinishTime) {
+        Set<Integer> predecessors = activity.getPredecessors();
+        int newStart = activity.getStart();
+        for (int p : predecessors) {
+            Activity predecessor = getActivity(p);
+            int predecessorFinish = predecessor.getStart() + predecessor.getDuration();
+            if (newStart <= predecessorFinish) {
+                newStart = predecessorFinish + 1;
             }
         }
-        return null;
-    }
-
-    public Resource getResource(int resourceId) {
-        for (Resource r : resources) {
-            if (r.getId() == resourceId) {
-                return r;
-            }
+        if (resourceFinishTime > newStart) {
+            newStart = resourceFinishTime + 1;
         }
-        return null;
+        activity.setStart(newStart);
     }
 
     /**
@@ -115,14 +148,15 @@ public class Schedule {
 
     /**
      * Finds all resources capable of doing given activity for different skills,
-     * available at the given timestamp.
+     * available at the given time.
+     * (could be used for optimization)
      */
-    public HashMap<Integer, List<Resource>> getAvailableResourcesForSkills(Activity activity, int timestamp) {
+    public HashMap<Integer, List<Resource>> getAvailableResourcesForSkills(Activity activity, int time) {
         HashMap<Integer, List<Resource>> resourcesPerSkills = new HashMap<>();
         for (int i = 0; i < numSkills; i++) {
             resourcesPerSkills.put(i, new ArrayList<>());
             for (Resource resource : resources) {
-                if (resource.hasAvailableSkill(activity, i) && timestamp >= resource.getFinish()) {
+                if (resource.hasAvailableSkill(activity, i) && time >= resource.getFinish()) {
                     resourcesPerSkills.get(i).add(resource);
                 }
             }
@@ -132,7 +166,8 @@ public class Schedule {
 
     /**
      * Finds a resource from the list freeResources with the earliest
-     * finish time of its work.
+     * finish time of its work
+     * (could be used for Greedy approach)
      */
     public Resource findFirstFreeResource(List<Resource> freeResources) {
         if (freeResources == null) {
@@ -150,28 +185,9 @@ public class Schedule {
     }
 
     /**
-     * Calculates the earliest possible time, in which activity
-     * given can be started. It is the time, when
-     * the last of its predecessors gets finished.
+     * Cleans time for resources and activities.
      */
-    public int getEarliestTime(Activity activity) {
-        int earliest = 0;
-        Set<Integer> predecessors = activity.getPredecessors();
-        if (predecessors != null) {
-            for (int p : predecessors) {
-                Activity pred = getActivity(p);
-                if (pred.getStart() + pred.getDuration() > earliest) {
-                    earliest = pred.getStart() + pred.getDuration();
-                }
-            }
-        }
-        return earliest;
-    }
-
-    /**
-     * Clears timestamps from activities and resources.
-     */
-    public void clear() {
+    public void cleanAll() {
         for (Activity activity : activities) {
             activity.setStart(-1);
             for (RequiredSkill requiredSkill : activity.getRequiredSkills()) {
@@ -189,6 +205,31 @@ public class Schedule {
                 skill.setResourceId(-1);
             }
             resource.setFinish(-1);
+        }
+    }
+
+    public void cleanResources() {
+        for (Resource resource : resources) {
+            for (Skill skill : resource.getSkills()) {
+                if (skill != null) {
+                    skill.setResourceId(-1);
+                }
+            }
+            resource.setFinish(-1);
+        }
+    }
+
+    public void cleanActivities() {
+        for (Activity activity : activities) {
+            for (RequiredSkill requiredSkill : activity.getRequiredSkills()) {
+                if (requiredSkill.getRequired() > 0) {
+                    for (Skill skill : requiredSkill.getSkills()) {
+                        if (skill != null) {
+                            skill.setResourceId(-1);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -217,5 +258,23 @@ public class Schedule {
 
     public void setNumSkills(int numSkills) {
         this.numSkills = numSkills;
+    }
+
+    public Activity getActivity(int activityId) {
+        for (Activity activity : activities) {
+            if (activity.getId() == activityId) {
+                return activity;
+            }
+        }
+        return null;
+    }
+
+    public Resource getResource(int resourceId) {
+        for (Resource r : resources) {
+            if (r.getId() == resourceId) {
+                return r;
+            }
+        }
+        return null;
     }
 }

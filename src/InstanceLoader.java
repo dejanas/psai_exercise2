@@ -22,10 +22,8 @@ public class InstanceLoader {
     private int numSkills;
     private int numResources;
 
-    private Skill[] skills;
     private Resource[] resources;
     private Activity[] activities;
-    boolean[] hasSuccessors;
 
     HashMap<Integer, Set<Integer>> predecessors;
 
@@ -57,8 +55,6 @@ public class InstanceLoader {
             resources = readResources(numResources, numSkills);
 
             predecessors = readPredecessors();
-
-            hasSuccessors = readSuccessors(predecessors, numActivities);
 
             activities = readActivities(numActivities, requiredSkills, duration, predecessors);
 
@@ -163,14 +159,17 @@ public class InstanceLoader {
         return predecessors;
     }
 
-    private boolean[] readSuccessors(HashMap<Integer, Set<Integer>> predecessors, int numActivities) throws IOException {
-        boolean[] successors = new boolean[numActivities];
-
+    private boolean[] readSuccessors(HashMap<Integer, Set<Integer>> predecessors, int numActivities) {
+        boolean[] successors = new boolean[numActivities + 1];
+        for (int i = 0; i < numActivities; i++) {
+            successors[i] = false;
+        }
         for (int i = 0; i < numActivities; ++i) {
-            if (predecessors.get(i) != null) {
-                successors[i] = true;
-            } else {
-                successors[i] = false;
+            Set<Integer> havePredecessors = predecessors.get(i);
+            if (havePredecessors != null) {
+                for (int pred : havePredecessors) {
+                    successors[pred] = true;
+                }
             }
         }
         return successors;
@@ -243,20 +242,12 @@ public class InstanceLoader {
         return numResources;
     }
 
-    public Skill[] getSkills() {
-        return skills;
-    }
-
     public Resource[] getResources() {
         return resources;
     }
 
     public Activity[] getActivities() {
         return activities;
-    }
-
-    public boolean[] getHasSuccessors() {
-        return hasSuccessors;
     }
 
     public HashMap<Integer, Set<Integer>> getPredecessors() {

@@ -7,6 +7,7 @@ import java.util.Random;
  * Selection step: Tournament selection for GeneticAlgorithm
  */
 public class Selection {
+
     private Integer tournamentSize;
     private final Population population;
     private Comparator<Individual> comparator;
@@ -14,7 +15,8 @@ public class Selection {
     public Selection(Integer tournamentSize, Population population) {
         this.tournamentSize = tournamentSize;
         this.population = population;
-        this.comparator = Comparator.comparingDouble(Individual::getFitness);
+        this.comparator = Comparator.comparing(Individual::getDuration);
+        comparator = comparator.thenComparing(Individual::getConflicts);
     }
 
     Individual tournament() {

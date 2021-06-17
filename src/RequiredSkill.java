@@ -5,13 +5,11 @@ public class RequiredSkill {
 
     private int type;
     private int required;
-    private int assigned;
     private Skill[] skills;
 
     public RequiredSkill(int type, int required) {
         this.type = type;
         this.required = required;
-        this.assigned = 0;
         this.skills = new Skill[required];
         for(int i = 0; i < required; i++){
             skills[i] = new Skill(type);

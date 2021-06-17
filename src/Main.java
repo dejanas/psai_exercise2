@@ -10,6 +10,7 @@ public class Main {
         int generation = 0;
         Population population = geneticAlgorithm.initializePopulation();
         population.evaluateDuration();
+        population.evaluateConstraints();
         try {
             PrintWriter pw = new PrintWriter("results/res_" + INSTANCE_NAME + ".csv");
             StringBuilder sb = new StringBuilder();
@@ -21,13 +22,16 @@ public class Main {
             sb.append(';');
             sb.append("avg");
             sb.append(';');
-            sb.append("makespan");
+            sb.append("avgConflicts");
             sb.append('\n');
+
+            sb.append(population);
 
             while (generation < geneticAlgorithm.getGenerations()) {
                 generation++;
                 population = geneticAlgorithm.createNewPopulation(population, generation);
                 population.evaluateDuration();
+                population.evaluateConstraints();
                 sb.append(population);
             }
             pw.write(sb.toString());

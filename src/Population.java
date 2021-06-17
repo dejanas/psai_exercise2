@@ -7,11 +7,17 @@ import java.util.ArrayList;
 public class Population {
     private ArrayList<Individual> individuals;
     private int id;
+
     private double bestTime;
     private double worstTime;
     private double sumTime;
     private double avgTime;
-    private double makespan;
+    private double normalizedTime;
+
+    private int numberOfConflicts;
+    private int leastConflicts;
+    private int mostConflicts;
+    private int avgConflicts;
 
     Population(ArrayList<Individual> individuals, int id) {
         this.individuals = individuals;
@@ -28,19 +34,19 @@ public class Population {
     }
 
     public String toString() {
-        return id + ";" + bestTime + ";" + worstTime + ";" + avgTime + ";" + makespan + '\n';
+        return id + ";" + bestTime + ";" + worstTime + ";" + avgTime + ";" + avgConflicts +'\n';
     }
 
     void evaluateDuration() {
         double bestTime = 0;
         double worstTime = 0;
         double sumTime = 0;
-        double makespan = 1;
+        double normalizedTime = 1;
 
-        for (Individual individual : this.individuals) {
+        for (Individual individual : individuals) {
             Evaluation evaluator = new Evaluation(individual.getSchedule());
             double duration = evaluator.getDuration();
-            individual.setFitness(duration);
+            individual.setDuration(duration);
             sumTime += duration;
             if (duration < bestTime || 0 == bestTime) {
                 bestTime = duration;
@@ -49,15 +55,37 @@ public class Population {
                 worstTime = duration;
             }
             double durationNormalized = evaluator.getDurationNormalized();
-            if(durationNormalized < makespan){
-                makespan = durationNormalized;
+            if(durationNormalized < normalizedTime){
+                normalizedTime = durationNormalized;
             }
         }
         this.bestTime = roundTwoDecimals(bestTime);
         this.worstTime = roundTwoDecimals(worstTime);
         this.sumTime = roundTwoDecimals(sumTime);
         this.avgTime = roundTwoDecimals(sumTime / individuals.size());
-        this.makespan = roundTwoDecimals(makespan);
+        this.normalizedTime = roundTwoDecimals(normalizedTime);
+    }
+
+    void evaluateConstraints(){
+        int leastConflicts = 0;
+        int mostConflicts = 0;
+        int sumConflicts = 0;
+
+        for (Individual individual : individuals) {
+            Evaluation evaluator = new Evaluation(individual.getSchedule());
+            int conflicts = evaluator.getNumberOfConflicts();
+            individual.setConflicts(conflicts);
+            sumConflicts += conflicts;
+            if (conflicts < leastConflicts) {
+                leastConflicts = conflicts;
+            }
+            if (conflicts > mostConflicts) {
+                mostConflicts = conflicts;
+            }
+        }
+        this.leastConflicts = leastConflicts;
+        this.mostConflicts = mostConflicts;
+        this.avgConflicts = sumConflicts/individuals.size();
     }
 
     double roundTwoDecimals(double d) {

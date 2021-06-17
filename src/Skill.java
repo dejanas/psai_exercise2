@@ -1,7 +1,6 @@
 /**
- * Defines skill existing in a project. Skill is an element linking resource and
- * activity. Only a resource with corresponding skill available s.t. it is required for the activity
- * can be assigned to that activity.
+ * Skill links resource and activity by resourceId field of a Skill and RequiredSkill.
+ * If resource is not still assigned, resourceId is -1.
  */
 public class Skill {
 

@@ -1,6 +1,4 @@
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 
 /**
@@ -8,20 +6,20 @@ import java.util.logging.Logger;
  */
 public class GeneticAlgorithm {
 
-    private static final Logger LOGGER = Logger.getLogger(GeneticAlgorithm.class.getName());
-
-    private int popSize;
-    private int generations;
-    private double mutationProbability;
-    private double crossoverProbability;
-    private Integer tournamentSize;
-    private Population newPopulation;
-    private String filename;
     private static final int DEFAULT_POP_SIZE = 300;
     private static final int DEFAULT_GENERATIONS = 100;
     private static final double DEFAULT_MUTATION_PROBABILITY = 0.01;
     private static final double DEFAULT_CROSSOVER_PROBABILITY = 0.1;
     private static final int DEFAULT_TOURNAMENT_SIZE = 5;
+
+    private int popSize;
+    private int generations;
+    private double mutationProbability;
+    private double crossoverProbability;
+    private Population newPopulation;
+    private String filename;
+    private Integer tournamentSize;
+    private RandomAlgorithm randomAlgorithm;
 
     /**
      * Constructor with parameters.
@@ -40,6 +38,7 @@ public class GeneticAlgorithm {
         this.crossoverProbability = crossoverProbability;
         this.tournamentSize = tournamentSize;
         this.filename = filename;
+        this.randomAlgorithm = new RandomAlgorithm();
     }
 
     /**
@@ -52,6 +51,7 @@ public class GeneticAlgorithm {
         this.crossoverProbability = DEFAULT_CROSSOVER_PROBABILITY;
         this.tournamentSize = DEFAULT_TOURNAMENT_SIZE;
         this.filename = filename;
+        this.randomAlgorithm = new RandomAlgorithm();
     }
 
     /**
@@ -76,101 +76,21 @@ public class GeneticAlgorithm {
     Population initializePopulation() {
         ArrayList<Individual> individuals = new ArrayList<>();
         for (int i = 0; i < getPopSize(); i++) {
-            Schedule schedule = randomInitializeSchedule();
-            // validateSchedule(schedule);
-            individuals.add(initializeIndividual(schedule));
+            Schedule initialSchedule = initializeSchedule();
+            randomAlgorithm.schedule(initialSchedule);
+            individuals.add(initializeIndividual(initialSchedule));
         }
         return new Population(individuals, 0);
     }
 
-    /**
-     * Random initialize schedule. Random assign activities to capable resources.
-     */
-    Schedule randomInitializeSchedule() {
-        Schedule initialSchedule = new Schedule(loadInstance(filename));
-        Activity[] activities = initialSchedule.getActivities();
-        Random generator = new Random();
-
-        for (Activity activity : activities) {
-            setEarliestStartTimeForActivity(initialSchedule, activity);
-            Set<Resource> assignedResources = new HashSet<>();
-
-            RequiredSkill[] requiredSkills = activity.getRequiredSkills();
-            for (RequiredSkill requiredSkill : requiredSkills) {
-                if (requiredSkill.getRequired() > 0) {
-                    for (Skill skill : requiredSkill.getSkills()) {
-                        HashMap<Integer, List<Resource>> resourcesForSkills = initialSchedule.getAvailableResourcesForSkills(activity);
-                        List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
-
-                        if (capableResources.size() == 0) {
-                            resourcesForSkills = initialSchedule.getCurrentlyUnavailableResourcesForSkills(activity);
-                            capableResources = resourcesForSkills.get(requiredSkill.getType());
-                            if (capableResources.isEmpty()) {
-                                LOGGER.log(Level.SEVERE, "No more available resources, something is wrong!");
-                            }
-                            Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                            shiftStartTimeForActivity(activity, resource.getFinish());
-                            initialSchedule.assign(activity, resource, skill);
-                            assignedResources.add(resource);
-                        } else {
-                            //TODO: also get resource with earlier finish time? greedy? improved?
-                            Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                            initialSchedule.assign(activity, resource, skill);
-                            assignedResources.add(resource);
-                        }
-                    }
-                } else {
-                    // TODO: add initial (dummy) activity
-                }
-            }
-            setTime(activity, assignedResources);
-        }
-        return initialSchedule;
+    private Schedule initializeSchedule() {
+        return new Schedule(loadInstance(filename));
     }
 
-    private void shiftStartTimeForActivity(Activity activity, int shift) {
-        activity.setStart(shift + 1);
-        //TODO: Add successors maybe?
-//        for(Activity successor : activity.getSuccessors()){
-//            successor.setStart(successor.getStart() + shift);
-//        }
+    private Schedule reinitializeSchedule(Schedule schedule, Activity[] activities) {
+        return new Schedule(schedule, activities);
     }
 
-    private Resource getResourceWithEarliestFinish(List<Resource> capableResources) {
-        Resource minResource = capableResources.get(0);
-        for (Resource resource : capableResources) {
-            if (resource.getFinish() < minResource.getFinish()) {
-                minResource = resource;
-            }
-        }
-        return minResource;
-    }
-
-    /**
-     * Sets starting time of activity to earliest possible depending on its predecessor relations.
-     */
-    private void setEarliestStartTimeForActivity(Schedule schedule, Activity activity) {
-        int start = schedule.getEarliestTime(activity);
-        activity.setStart(start);
-    }
-
-    /**
-     * Reconfigures starting time of activity due to resources available for it.
-     */
-    private void setTime(Activity activity, Set<Resource> resourceSet) {
-        int start = activity.getStart();
-        for (Resource resource : resourceSet) {
-            if (resource.getFinish() > start) {
-                start = resource.getFinish();
-            }
-        }
-        activity.setStart(start);
-        for (Resource resource : resourceSet) {
-            resource.setFinish(start + activity.getDuration());
-        }
-    }
-
-    //TODO: call
     void validateSchedule(Schedule schedule) {
         ConstraintValidation validator = new ConstraintValidation(schedule);
         validator.validate();
@@ -182,22 +102,28 @@ public class GeneticAlgorithm {
 
         while (currentIndividual < getPopSize()) {
             Individual individual = select(population);
+            Activity[] activities = individual.getSchedule().getActivities();
+            Activity[] childActivities = null;
 
             if (shouldDoCrossover()) {
                 Individual parent2 = select(population);
-                individual = crossover(individual, parent2);
+                Activity[] parent2activities = parent2.getSchedule().getActivities();
+                childActivities = crossover(activities, parent2activities);
             }
 
-            //TODO: fix mutation step
-            if (false/*shouldDoMutation()*/) {
-                individual = mutate(individual);
+            if (childActivities == null) {
+                childActivities = activities;
             }
 
-            Schedule schedule = individual.getSchedule();
+            if (shouldDoMutation()) {
+                mutate(childActivities);
+            }
+
+            Schedule schedule = reinitializeSchedule(individual.getSchedule(), childActivities);
+
             newPopulation.addNewIndividual(initializeIndividual(schedule));
             currentIndividual++;
         }
-
         return newPopulation;
     }
 
@@ -206,76 +132,89 @@ public class GeneticAlgorithm {
      */
     Individual select(Population population) {
         Selection selection = new Selection(getTournamentSize(), population);
-        return new Individual(selection.tournament());
+        return selection.tournament();
     }
 
     /**
      * Recombination step: generate child from two parent individuals with crossover method
      */
-    Individual crossover(Individual parent1, Individual parent2) {
-        Activity[] parent1activities = parent1.getSchedule().getActivities();
-        Activity[] parent2Activities = parent2.getSchedule().getActivities();
-
+    Activity[] crossover(Activity[] parent1activities, Activity[] parent2activities) {
         Random generator = new Random();
         int crossoverPoint = generator.nextInt(parent1activities.length);
+
         Activity[] childActivities = new Activity[parent1activities.length];
 
-        int currentActivity = 0;
-        while (currentActivity < childActivities.length) {
-            if (currentActivity < crossoverPoint) {
-                childActivities[currentActivity] = parent1activities[currentActivity];
-            } else {
-                childActivities[currentActivity] = parent2Activities[currentActivity];
-            }
-            currentActivity++;
+        Set<Integer> alreadyAddedActivitiesById = new HashSet<>();
+        int currentIndex = 0;
+        while (currentIndex < crossoverPoint) {
+            Activity activity = parent1activities[currentIndex];
+            childActivities[currentIndex] = activity;
+            alreadyAddedActivitiesById.add(activity.getId());
+            currentIndex++;
         }
-        Schedule child = parent1.getSchedule();
-        child.setActivities(childActivities);
-        return new Individual(child);
+
+        while (currentIndex < childActivities.length) {
+            Activity activity = parent2activities[currentIndex];
+            if (!alreadyAddedActivitiesById.contains(activity.getId())) {
+                childActivities[currentIndex] = activity;
+                alreadyAddedActivitiesById.add(activity.getId());
+            } else {
+                childActivities[currentIndex] = null;
+            }
+            currentIndex++;
+        }
+
+        for (int i = 0; i < childActivities.length; i++) {
+            Activity currentActivity = childActivities[i];
+            if (currentActivity == null) {
+                childActivities[i] = findMissingActivityInParentArray(childActivities, parent1activities);
+            }
+        }
+        return childActivities;
     }
 
     /**
-     * Mutatation step: mutate one activity to use different recourses
+     * Populate missing activities in the array by taking the activity from one of the parents
      */
-    Individual mutate(Individual individual) {
-        Schedule schedule = individual.getSchedule();
-        Activity[] activities = schedule.getActivities();
-
-        Random generator = new Random();
-        Activity activityToMutate = activities[generator.nextInt(activities.length)];
-
-        RequiredSkill[] requiredSkills = activityToMutate.getRequiredSkills();
-        Set<Resource> assignedResources = new HashSet<>();
-
-        for (RequiredSkill requiredSkill : requiredSkills) {
-            if (requiredSkill.getRequired() > 0) {
-                for (Skill skill : requiredSkill.getSkills()) {
-                    HashMap<Integer, List<Resource>> resourcesForSkills = schedule.getAvailableResourcesForSkills(activityToMutate);
-                    List<Resource> capableResources = resourcesForSkills.get(requiredSkill.getType());
-
-                    if (capableResources.size() == 0) {
-                        resourcesForSkills = schedule.getCurrentlyUnavailableResourcesForSkills(activityToMutate);
-                        capableResources = resourcesForSkills.get(requiredSkill.getType());
-                        if (capableResources.isEmpty()) {
-                            LOGGER.log(Level.SEVERE, "No more available resources, something is wrong!");
-                        }
-                        Resource resource = getResourceWithEarliestFinish(capableResources);
-                        shiftStartTimeForActivity(activityToMutate, resource.getFinish());
-                        schedule.assign(activityToMutate, resource, skill);
-                        assignedResources.add(resource);
-                    } else {
-                        //TODO: also get resource with earlier finish time? greedy? improved?
-                        Resource resource = capableResources.get(generator.nextInt(capableResources.size()));
-                        schedule.assign(activityToMutate, resource, skill);
-                        assignedResources.add(resource);
+    private Activity findMissingActivityInParentArray(Activity[] childActivities, Activity[] parent1activities) {
+        HashMap<Integer, Activity> childActivitiesById = new HashMap<>();
+        for (Activity activity : childActivities) {
+            if (activity != null) {
+                childActivitiesById.put(activity.getId(), activity);
+            }
+        }
+        for (int i = 1; i < childActivities.length + 1; i++) {
+            if (!childActivitiesById.containsKey(i)) {
+                for (Activity activity : parent1activities) {
+                    if (activity.getId() == i) {
+                        return activity;
                     }
                 }
-            } else {
-                // TODO: add initial (dummy) activity
             }
-            setTime(activityToMutate, assignedResources);
         }
-        return individual;
+        return null;
+    }
+
+    /**
+     * Mutatation step: mutate one activity to have different starting time
+     */
+    void mutate(Activity[] activities) {
+
+        Random generator = new Random();
+        int positionToMutate = generator.nextInt(activities.length - 1);
+        int positionToMutateWith = positionToMutate + 1;
+
+        // try with swapping two start times of activities
+        //        Activity tempActivity1 = activities[positionToMutate];
+        //        Activity tempActivity2 = activities[positionToMutateWith];
+        //        int tempStart1 = tempActivity1.getStart();
+        //        tempActivity1.setStart(tempActivity2.getStart());
+        //        tempActivity2.setStart(tempStart1);
+        //        activities[positionToMutate] = tempActivity2;
+        //        activities[positionToMutateWith] = tempActivity1;
+
+        Activity activityToMutate = activities[positionToMutate];
+        activityToMutate.setStart(activityToMutate.getStart() + 1);
     }
 
     boolean shouldDoCrossover() {
