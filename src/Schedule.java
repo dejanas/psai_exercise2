@@ -1,5 +1,4 @@
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * Describes the project definition and also the solution itself - a project schedule.
@@ -60,9 +59,6 @@ public class Schedule {
         if (predecessors != null) {
             for (int p : predecessors) {
                 Activity pred = getActivity(p);
-                if(pred == null){
-                    int i = 0;
-                }
                 int predFinish = pred.getStart() + pred.getDuration();
                 if (predFinish > earliest) {
                     earliest = predFinish + 1;
